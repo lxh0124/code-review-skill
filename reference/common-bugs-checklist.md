@@ -194,6 +194,8 @@ Quick-reference bug patterns organized by category. For detailed code examples, 
 - [ ] Not handling `NULL` comparisons correctly (`IS NULL` vs `= NULL`)
 - [ ] Missing transactions for related operations
 - [ ] Incorrect JOIN types
+- [ ] Collation / case sensitivity surprises across databases (MySQL vs Postgres defaults)
+- [ ] Date and timezone handling errors (naive timestamps, server-local `NOW()`, DST)
 
 **See also:** [Security Review Guide](security-review-guide.md) for SQL injection prevention
 

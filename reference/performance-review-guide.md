@@ -742,6 +742,70 @@ function factorial(n) {
 
 ---
 
+## 低级别效率反模式
+
+代码层面的效率失误，独立于架构层面的性能问题。补充 [common-bugs-checklist.md](common-bugs-checklist.md) 中已涵盖的资源管理与并发缺陷。
+
+### 不必要的重复工作
+
+- [ ] 同一函数 / 查询是否在同一 request/render 中被重复调用？
+- [ ] 文件 / 配置是否在循环内重复读取（loop-invariant）？
+- [ ] 计算结果是否可以被缓存或向下游传递？
+
+```typescript
+// ❌ loop-invariant 在循环内反复执行
+for (const path of paths) {
+  const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+  processFile(path, config);
+}
+
+// ✅ 提到循环外
+const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+for (const path of paths) processFile(path, config);
+```
+
+### 错失的并发机会
+
+- [ ] 独立的 async 操作是否顺序 `await`？
+- [ ] 是否可以用 `Promise.all` / `asyncio.gather` / `tokio::join!` 并发？
+
+```typescript
+// ❌ 顺序 await
+const a = await fetchA();
+const b = await fetchB();
+
+// ✅ 并发
+const [a, b] = await Promise.all([fetchA(), fetchB()]);
+```
+
+### 热路径膨胀
+
+- [ ] 模块级 / import 时代码是否执行重操作（文件 I/O、网络、大对象构造）？
+- [ ] per-request 路径是否有可延迟的初始化？
+- [ ] 启动时代码是否阻塞首次请求？
+
+### 无界数据结构
+
+> 资源生命周期相关缺陷（未关闭的连接、未移除的监听器、未清除的定时器）见 [common-bugs-checklist.md → Resource Management](common-bugs-checklist.md#resource-management)。本节聚焦 *容量边界*。
+
+- [ ] 全局 dict / list / 缓存是否有 `max-size` 或 TTL？
+- [ ] 累积型数据结构（队列、日志、metrics buffer）是否有上限？
+- [ ] 每请求分配的对象是否会被持久引用而无法 GC？
+
+```python
+# ❌ 无界缓存
+_cache: dict[str, Any] = {}
+
+# ✅ 有界 LRU
+from functools import lru_cache
+
+@lru_cache(maxsize=256)
+def get_cached(key: str) -> Any:
+    return expensive_computation(key)
+```
+
+---
+
 ## 参考资源
 
 - [Core Web Vitals - web.dev](https://web.dev/articles/vitals)
@@ -750,126 +814,3 @@ function factorial(n) {
 - [Big O Cheat Sheet](https://www.bigocheatsheet.com/)
 - [N+1 Query Problem - Stack Overflow](https://stackoverflow.com/questions/97197/what-is-the-n1-selects-problem-in-orm-object-relational-mapping)
 - [API Performance Optimization](https://algorithmsin60days.com/blog/optimizing-api-performance/)
-
----
-
-## 低级别效率反模式
-
-### 不必要的重复工作
-
-```python
-# ❌ 同一个函数在一个请求中被调用两次
-user = get_user(user_id)
-# ... 30 lines later ...
-user = get_user(user_id)  # redundant
-
-# ✅ 复用已有结果
-user = get_user(user_id)
-# pass user to downstream code
-```
-
-```typescript
-// ❌ 循环内重复读取文件
-for (const path of paths) {
-  const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-  processFile(path, config);
-}
-
-// ✅ 循环外读取一次
-const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-for (const path of paths) {
-  processFile(path, config);
-}
-```
-
-**审查要点：**
-- [ ] 函数/查询在同一 request/render 中被重复调用？
-- [ ] 文件或配置在循环内重复读取？
-- [ ] 计算结果是否可以被缓存或传递？
-
-### 错失的并发机会
-
-```python
-# ❌ 三个独立的 HTTP 请求顺序执行
-user = await fetch_user(user_id)
-orders = await fetch_orders(user_id)
-prefs = await fetch_preferences(user_id)
-
-# ✅ 并发执行独立请求
-import asyncio
-user, orders, prefs = await asyncio.gather(
-    fetch_user(user_id),
-    fetch_orders(user_id),
-    fetch_preferences(user_id),
-)
-```
-
-```typescript
-// ❌ 顺序 await 独立操作
-const a = await fetchA();
-const b = await fetchB();
-
-// ✅ Promise.all 并发
-const [a, b] = await Promise.all([fetchA(), fetchB()]);
-```
-
-**审查要点：**
-- [ ] 独立的 async/await 操作是否顺序执行？
-- [ ] 是否可以用 `Promise.all` / `asyncio.gather` / `join_all` 并发？
-- [ ] 文件 I/O 或网络调用是否在热路径上阻塞？
-
-### 热路径膨胀
-
-```python
-# ❌ 启动时加载所有数据到内存
-ALL_COUNTRIES = json.loads(Path("countries.json").read_text())  # 50ms
-
-# ✅ 惰性加载
-_countries_cache: list[dict] | None = None
-
-def get_countries() -> list[dict]:
-    global _countries_cache
-    if _countries_cache is None:
-        _countries_cache = json.loads(Path("countries.json").read_text())
-    return _countries_cache
-```
-
-```typescript
-// ❌ import 时执行重操作
-const heavyModule = require("./heavy"); // module-level side effect
-
-// ✅ 动态 import 或 lazy init
-async function useHeavy() {
-  const heavyModule = await import("./heavy");
-  return heavyModule.process();
-}
-```
-
-**审查要点：**
-- [ ] 模块级 / 启动时代码是否执行重操作（文件 I/O、网络、大对象创建）？
-- [ ] per-request 路径是否有可延迟的初始化？
-- [ ] import 时是否有 side effect（DB 连接、文件读取）？
-
-### 无界数据结构
-
-```python
-# ❌ 缓存永不清理——内存泄漏
-_cache: dict[str, Any] = {}
-
-def get_cached(key: str, factory: Callable) -> Any:
-    if key not in _cache:
-        _cache[key] = factory()
-    return _cache[key]
-
-# ✅ 有界的 LRU 缓存
-from functools import lru_cache
-
-@lru_cache(maxsize=256)
-def get_cached(key: str) -> Any:
-    return expensive_computation(key)
-```
-
-**审查要点：**
-- [ ] 全局 dict/list 是否有清理机制？
-- [ ] 事件监听器是否在组件销毁时移除？
-- [ ] 缓存是否有 max-size 或 TTL？

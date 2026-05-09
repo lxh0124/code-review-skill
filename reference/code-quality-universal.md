@@ -14,7 +14,7 @@
 - [TOCTOU 竞争条件](#toctou-竞争条件)
 - [过度宽泛操作](#过度宽泛操作)
 - [冗余状态](#冗余状态)
-- [Review Checklist](#review-checklist)
+- [通用质量审查清单](#通用质量审查清单)
 
 ---
 
@@ -209,13 +209,7 @@ const bg = isHovered
   ? isSelected ? "blue" : "gray"
   : isSelected ? "navy" : "white";
 
-// ✅ 查找表
-const bg = (
-  { [`${isHovered}-${isSelected}`]: true }
-)[`${isHovered}-${isSelected}`]
-  ?? (isHovered ? "gray" : "white");
-
-// ✅✅ 更好：提前 return 或 lookup map
+// ✅ 查找表（lookup map）
 const bgMap: Record<string, string> = {
   "true-true": "blue",
   "true-false": "gray",
@@ -482,7 +476,7 @@ class Order:
 
 ---
 
-## Review Checklist
+## 通用质量审查清单
 
 - [ ] **复用审查**: 搜索了现有 utility/helper，没有重复造轮子？
 - [ ] **参数数量**: 函数参数 ≤ 3 个？超过则用 options object / dataclass？

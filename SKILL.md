@@ -191,7 +191,7 @@ Use labels to indicate priority:
 | **Python** | [Python Guide](reference/python.md) | 可变默认参数, 异常处理, 类属性 |
 | **Django / DRF** | [Django Guide](reference/django.md) | 安全审查, N+1 查询, Serializer 反模式, ViewSet, 异步视图 |
 | **FastAPI** | [FastAPI Guide](reference/fastapi.md) | Depends, Pydantic v2 validation, async correctness, sessions/N+1, auth vs authorization, test-driven verification |
-| **Java** | [Java Guide](reference/java.md) | Java 17/21 新特性, Spring Boot 3, 虚拟线程, Stream/Optional |
+| **Java** | [Java Guide](reference/java.md) | Java 17/21 新特性, Spring Boot 3, 虚拟线程, Stream/Optional, [P3C 阿里规约](reference/custom/ali-java/) |
 | **PHP** | [PHP Guide](reference/php.md) | PHP 8.x type system, PDO, security review, Composer, PHPUnit/PHPStan |
 | **C# / .NET** | [C# Guide](reference/csharp.md) | C# 12 特性, 异步编程, EF Core 性能, ASP.NET Core, LINQ |
 | **Go** | [Go Guide](reference/go.md) | 错误处理, goroutine/channel, context, 接口设计 |
@@ -222,6 +222,20 @@ Language-agnostic patterns applicable to all code reviews:
 | **Error Handling** | [Error Handling Guide](reference/cross-cutting/error-handling-principles.md) | Fail fast, error hierarchy, 7 languages, anti-patterns, logging |
 | **Async & Concurrency** | [Concurrency Guide](reference/cross-cutting/async-concurrency-patterns.md) | Goroutines, async/await, actors, structured concurrency, 7 languages |
 | **Review Best Practices** | [Code Review Best Practices](reference/code-review-best-practices.md) | Communication, reviewer mindset, giving feedback, severity labels |
+
+## Java 规约加载顺序
+
+完整索引见 [Java Guide](reference/java.md)。推荐顺序：**金融红线 → P3C 基础 → 专题**。
+
+| 场景 | 加载文件 |
+|------|----------|
+| 金融 / 支付 / 账务 | `custom/finance-java-block` **（最先）** → P3C 基础 + 相关专题 |
+| 通用业务 Java | P3C 基础（`ali-base` 等）+ 变更涉及的专题 |
+| DB / MyBatis 变更 | + `ali-sql-mysql` |
+| 并发 / 锁 / 线程池 | + `ali-concurrent` + `ali-datetime` |
+| API / Controller | + `ali-api` + `ali-error-code` + `ali-security` |
+| 架构 / 方案评审 | + `ali-design` + `ali-project` |
+| 补单测 | + `ali-unit-test` |
 
 ## Additional Resources
 
